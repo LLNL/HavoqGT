@@ -8,7 +8,7 @@
 #define HAVOQGT_MPI_PAGE_RANK_HPP_INCLUDED
 
 
-
+#include <limits>
 #include <havoqgt/visitor_queue.hpp>
 #include <boost/container/deque.hpp>
 #include <vector>

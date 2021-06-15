@@ -6,7 +6,7 @@
 #ifndef HAVOQGT_MPI_BREADTH_FIRST_SEARCH_HPP_INCLUDED
 #define HAVOQGT_MPI_BREADTH_FIRST_SEARCH_HPP_INCLUDED
 
-
+#include <limits>
 #include <havoqgt/visitor_queue.hpp>
 #include <havoqgt/detail/visitor_priority_queue.hpp>
 #include <boost/container/deque.hpp>

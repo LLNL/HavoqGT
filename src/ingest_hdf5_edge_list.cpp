@@ -119,30 +119,45 @@ void parse_cmd_line(int argc, char** argv, std::string& output_filename, std::st
   }
 }
 
+std::vector<std::string> local_assign_inputs(const std::vector<std::string>& all_filenames) {
+  const int shm_rank  = comm_nl().rank();
+  const int shm_size  = comm_nl().size();
+  const int node_rank = comm_nr().rank();
+  const int node_size = comm_nr().size();
+
+  std::vector<std::string> sub_filenames;
+  for (std::size_t i = 0; i < all_filenames.size(); ++i) {
+    if (i % node_size == node_rank && (i / node_size) % shm_size == shm_rank) {
+      sub_filenames.push_back(all_filenames[i]);
+    }
+  }
+}
+
 auto read_edge(const std::vector<std::string> &input_filenames,
                const std::string &src_key,
                const std::string &dst_key,
                const std::string &weight_key,
                const bool undirected) {
-  const int mpi_rank = comm_world().rank();
-  const int mpi_size = comm_world().size();
+
+  std::vector<std::string> assigned_filenames = local_assign_inputs(input_filenames);
 
   std::vector<std::tuple<uint64_t, uint64_t, weight_type>> edge_list;
-  for (std::size_t i = 0; i < input_filenames.size(); ++i) {
-    if (i % mpi_size == mpi_rank) {
-      hdf5_edge_list_reader reader;
-      if (!reader.read(input_filenames[i], src_key, dst_key, weight_key)) {
-        std::cerr << "Failed to read edge: " << input_filenames[i] << std::endl;
-      }
-      const auto &read_edge_lists = reader.edges();
-      assert(std::get<0>(read_edge_lists).size() == std::get<1>(read_edge_lists).size());
-      for (std::size_t e = 0; e < std::get<0>(read_edge_lists).size(); ++e) {
-        const auto src = std::get<0>(read_edge_lists)[e];
-        const auto dst = std::get<1>(read_edge_lists)[e];
-        const auto weight = weight_key.empty() ? weight_type() : std::get<2>(read_edge_lists)[e];
-        edge_list.emplace_back(src, dst, weight);
-        if (undirected) edge_list.emplace_back(dst, src, weight);
-      }
+  for (const auto& file_name : assigned_filenames) {
+    hdf5_edge_list_reader reader;
+    if (!reader.read(file_name, src_key, dst_key, weight_key)) {
+      std::cerr << "Failed to read edge: " << file_name << std::endl;
+    }
+
+    const auto& read_edge_lists = reader.edges();
+    assert(std::get<0>(read_edge_lists).size() ==
+           std::get<1>(read_edge_lists).size());
+    for (std::size_t e = 0; e < std::get<0>(read_edge_lists).size(); ++e) {
+      const auto src = std::get<0>(read_edge_lists)[e];
+      const auto dst = std::get<1>(read_edge_lists)[e];
+      const auto weight = weight_key.empty() ? weight_type()
+                                             : std::get<2>(read_edge_lists)[e];
+      edge_list.emplace_back(src, dst, weight);
+      if (undirected) edge_list.emplace_back(dst, src, weight);
     }
   }
 
